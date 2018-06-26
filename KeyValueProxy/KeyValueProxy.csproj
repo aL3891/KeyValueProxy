@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+		<Version>1.0.0-RC</Version>
+		<Title>Key/Value Proxy</Title>
+		<Description>Small library to create a interface proxy over a key value store. Generates keys from property paths.</Description>
+		<Copyright>2018</Copyright>
+		<PackageProjectUrl>https://github.com/aL3891/KeyValueProxy</PackageProjectUrl>
+		<PackageLicenseUrl></PackageLicenseUrl>
+		<PackageTags>KeyValue Proxy</PackageTags>
+		<RepositoryUrl>https://github.com/aL3891/KeyValueProxy</RepositoryUrl>
+		<Authors>Allan Lindqvist</Authors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Reflection.DispatchProxy" Version="4.5.1" />
+  </ItemGroup>
+</Project>
