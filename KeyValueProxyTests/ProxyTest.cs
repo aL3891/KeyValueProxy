@@ -11,7 +11,9 @@ namespace KeyValueProxyTests
 	[TestClass]
 	public class ProxyTest
 	{
-		[TestMethod]
+        private bool gotEvent;
+
+        [TestMethod]
 		public async Task RegularProperty()
 		{
 			var store = new DictionaryKVStore();
@@ -28,16 +30,16 @@ namespace KeyValueProxyTests
 			store.Store.Should().Contain("LastName", "test2");
 
             target.PropertyChanged += Target_PropertyChanged;
-            target.FirstName = "test";
+            target.Age = 1;
             target.PropertyChanged -= Target_PropertyChanged;
-            target.FirstName = "test";
+            target.Age = 1;
         }
 
         private void Target_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             gotEvent.Should().BeFalse();
             gotEvent = true;
-            e.PropertyName.Should().Be("FirstName");
+            e.PropertyName.Should().Be("Age");
         }
 
         [TestMethod]

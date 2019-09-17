@@ -4,7 +4,7 @@ using System.ComponentModel;
 
 namespace KeyValueProxyTests
 {
-	public interface IPerson
+	public interface IPerson : INotifyPropertyChanged
 	{
 		string GetFirstName();
 		void SetFirstName(string name);
