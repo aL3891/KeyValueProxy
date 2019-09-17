@@ -43,12 +43,24 @@ namespace KeyValueProxy
                 var res = m.storeMethod.Invoke(root.store, a);
                 if (m.sendNpc && eventHandlers != null)
                 {
+                    List<WeakReference<PropertyChangedEventHandler>> toRemove = null;
                     foreach (var handler in eventHandlers)
                     {
                         if (handler.TryGetTarget(out var r))
                             r(this, new PropertyChangedEventArgs(m.name));
+                        else
+                        {
+                            if (toRemove == null)
+                                toRemove = new List<WeakReference<PropertyChangedEventHandler>>();
+                        }
                     }
-                    eventHandlers.RemoveAll(w => !w.TryGetTarget(out var r));
+                    if (toRemove != null)
+                    {
+                        foreach (var tr in toRemove)
+                        {
+                            eventHandlers.Remove(tr);
+                        }
+                    }
                 }
                 return res;
             }
