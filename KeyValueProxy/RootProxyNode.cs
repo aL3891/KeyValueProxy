@@ -1,6 +1,6 @@
 ﻿namespace KeyValueProxy
 {
-	internal class RootProxyNode : ProxyNode
+    public class RootProxyNode : ProxyNode
 	{
 		internal IKeyValueProxyStore store { get; set; }
 	}
