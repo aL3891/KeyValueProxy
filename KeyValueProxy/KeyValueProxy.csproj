@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>netstandard2.0</TargetFrameworks>
-		<Version>1.1.0</Version>
+		<Version>1.2.0</Version>
 		<Title>Key/Value Proxy</Title>
 		<Description>Small library to create a interface proxy over a key value store. Generates keys from property paths.</Description>
 		<Copyright>2018</Copyright>

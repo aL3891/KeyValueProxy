@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace KeyValueProxy
 {
@@ -6,14 +7,24 @@ namespace KeyValueProxy
 	{
 		public Dictionary<string, object> Store { get; set; } = new Dictionary<string, object>();
 
-		public void SetValue(string property, object value)
+		public void SetValue<T>(string property, T value)
 		{
 			Store[property] = value;
 		}
 
-		public object GetValue(string property)
+		public T GetValue<T>(string property)
 		{
-			return Store.TryGetValue(property, out var res) ? res : null;
+			return (T)Store[property];
+		}
+
+		public async Task SetValueAsync<T>(string property, T value)
+		{
+			Store[property] = value;
+		}
+
+		public async Task<T> GetValueAsync<T>(string property)
+		{
+			return (T)Store[property];
 		}
 	}
 }

@@ -1,8 +1,13 @@
-﻿namespace KeyValueProxy
+﻿using System.Threading.Tasks;
+
+namespace KeyValueProxy
 {
 	public interface IKeyValueProxyStore
 	{
-		void SetValue(string property, object value);
-		object GetValue(string property);
+		void SetValue<T>(string property, T value);
+		T GetValue<T>(string property);
+
+		Task SetValueAsync<T>(string property, T value);
+		Task<T> GetValueAsync<T>(string property);
 	}
 }

@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using FluentAssertions;
 using KeyValueProxy;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -7,23 +8,29 @@ using System.Reflection;
 
 namespace KeyValueProxyTests
 {
-    [TestClass]
-    public class ProxyTest
-    {
-        bool gotEvent = false;
+	[TestClass]
+	public class ProxyTest
+	{
+		[TestMethod]
+		public async Task RegularProperty()
+		{
+			var store = new DictionaryKVStore();
+			var target = KeyValueProxyFactory.Create<IPerson>(store);
 
-        [TestMethod]
-        public void RegularProperty()
-        {
-            var store = new DictionaryKVStore();
-            var target = KeyValueProxyFactory.Create<IPerson>(store);
+			target.SetFirstName("test");
+			target.GetFirstName().Should().Be("test");
+			await target.SetLastName("test2");
+			(await target.GetLastName()).Should().Be("test2");
+			target.Age = 1;
+			target.Age.Should().Be(1);
+
+			store.Store.Should().Contain("FirstName", "test");
+			store.Store.Should().Contain("LastName", "test2");
 
             target.PropertyChanged += Target_PropertyChanged;
             target.FirstName = "test";
             target.PropertyChanged -= Target_PropertyChanged;
             target.FirstName = "test";
-            target.FirstName.Should().Be("test");
-            store.Store.Should().Contain("FirstName", "test");
         }
 
         private void Target_PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -34,15 +41,22 @@ namespace KeyValueProxyTests
         }
 
         [TestMethod]
-        public void SubProperty()
-        {
-            var store = new DictionaryKVStore();
-            var target = KeyValueProxyFactory.Create<IPerson>(store);
+		public async Task SubProperty()
+		{
+			var store = new DictionaryKVStore();
+			var target = KeyValueProxyFactory.Create<IPerson>(store);
 
-            target.Address.Street = "test";
-            target.Address.Street.Should().Be("test");
-            store.Store.Should().Contain("Address.Street", "test");
-        }
+			target.Address.Street = "test";
+			target.Address.Street.Should().Be("test");
+
+			target.Address.SetPostalCode("test2");
+			target.Address.GetPostalCode().Should().Be("test2");
+
+			await target.Address.SetCity("test2");
+			(await target.Address.GetCity()).Should().Be("test2");
+
+			store.Store.Should().Contain("Address.Street", "test");
+		}
 
         [TestMethod]
         public void SubSubProperty()

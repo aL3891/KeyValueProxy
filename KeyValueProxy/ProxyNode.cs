@@ -2,37 +2,44 @@
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Reflection;
+using System.Threading.Tasks;
 
 namespace KeyValueProxy
 {
 
-    public class ProxyNode : DispatchProxy
-    {
-        Dictionary<MethodInfo, ProxyNode> children = new Dictionary<MethodInfo, ProxyNode>();
-        Dictionary<MethodInfo, string> getters = new Dictionary<MethodInfo, string>();
-        Dictionary<MethodInfo, string> setters = new Dictionary<MethodInfo, string>();
-        RootProxyNode root;
-        private bool notify;
+	public class ProxyNode : DispatchProxy
+	{
+		private static MethodInfo KVGetMethod;
+		public static MethodInfo KVGetMethodAsync;
+		private static MethodInfo KVSetMethod;
+		private static MethodInfo KVSetMethodAsync;
+
+		private Dictionary<MethodInfo, ProxyNode> children = new Dictionary<MethodInfo, ProxyNode>();
+		private Dictionary<MethodInfo, (MethodInfo storeMethod, string key)> Meth = new Dictionary<MethodInfo, (MethodInfo storeMethod, string key)>();
+		private RootProxyNode root;
+		private string path;
         List<PropertyChangedEventHandler> eventHandlers = null;
 
+        static ProxyNode()
+		{
+			var t = typeof(IKeyValueProxyStore);
+			KVGetMethod = t.GetMethod("GetValue");
+			KVGetMethodAsync = t.GetMethod("GetValueAsync");
+			KVSetMethod = t.GetMethod("SetValue");
+			KVSetMethodAsync = t.GetMethod("SetValueAsync");
+		}
 
-        protected override object Invoke(MethodInfo targetMethod, object[] args)
-        {
-            if (children.TryGetValue(targetMethod, out var node))
-            {
-                return node;
-            }
-            else if (getters.TryGetValue(targetMethod, out var gName))
-            {
-                var res = root?.store?.GetValue(gName);
-                if (res == null && targetMethod.ReturnType.IsValueType)
-                    return Activator.CreateInstance(targetMethod.ReturnType);
-                else
-                    return res;
-            }
-            else if (setters.TryGetValue(targetMethod, out var sName))
-            {
-                root?.store?.SetValue(sName, args[0]);
+		protected override object Invoke(MethodInfo targetMethod, object[] args)
+		{
+			if (children.TryGetValue(targetMethod, out var node))
+			{
+				return node;
+			}
+			else if (Meth.TryGetValue(targetMethod, out var m))
+			{
+				var a = new object[args.Length + 1];
+				Array.Copy(args, 0, a, 1, args.Length);
+				a[0] = m.key;
                 if (eventHandlers != null)
                 {
                     foreach (var handler in eventHandlers)
@@ -40,8 +47,8 @@ namespace KeyValueProxy
                         handler(this, new PropertyChangedEventArgs(sName));
                     }
                 }
-                return null;
-            }
+                return m.storeMethod.Invoke(root.store, a);
+			}
             else if (targetMethod.Name == "add_PropertyChanged")
             {
                 if (eventHandlers == null)
@@ -59,23 +66,51 @@ namespace KeyValueProxy
             throw new NotSupportedException("Proxy does not support method " + targetMethod.Name);
         }
 
-        internal void Initialize(Type type, string path, RootProxyNode root)
-        {
-            this.root = root;
-            notify = typeof(INotifyPropertyChanged).IsAssignableFrom(type);
-            foreach (var p in type.GetProperties())
-            {
-                if (p.PropertyType.IsInterface)
-                {
-                    var c = KeyValueProxyFactory.CreateChild(p, (path != null ? path + "." : "") + p.Name, root);
-                    children.Add(p.GetMethod, c);
-                }
-                else
-                {
-                    getters.Add(p.GetMethod, (path != null ? path + "." : "") + p.Name);
-                    setters.Add(p.SetMethod, (path != null ? path + "." : "") + p.Name);
-                }
-            }
-        }
-    }
+		internal void Initialize(Type type, string path, RootProxyNode root)
+		{
+
+			this.root = root;
+			this.path = path;
+
+			foreach (var p in type.GetMethods())
+			{
+				var propPath = (path != null ? path + "." : "") + p.Name.Substring(p.Name[3] == '_' ? 4 : 3);
+				var isAsync = p.ReturnType == typeof(Task) || p.ReturnType.IsGenericType && p.ReturnType.GetGenericTypeDefinition() == typeof(Task<>);
+				Type methodType = null;
+				MethodInfo storeMethod = null;
+
+				if (p.Name.StartsWith("set", StringComparison.OrdinalIgnoreCase))
+				{
+					methodType = p.GetParameters()[0].ParameterType;
+					storeMethod = isAsync ? KVSetMethodAsync : KVSetMethod;
+				}
+				else if (p.Name.StartsWith("get", StringComparison.OrdinalIgnoreCase))
+				{
+					methodType = p.ReturnType;
+					if (methodType.IsInterface)
+					{
+						var c = KeyValueProxyFactory.CreateChild(methodType, propPath, root);
+						children.Add(p, c);
+						continue;
+					}
+
+					if (isAsync)
+					{
+						methodType = methodType.GetGenericArguments()[0];
+						storeMethod = KVGetMethodAsync;
+					}
+					else
+					{
+						storeMethod = KVGetMethod;
+					}
+				}
+				else
+				{
+					continue;
+				}
+
+				Meth.Add(p, (storeMethod.MakeGenericMethod(methodType), propPath));
+			}
+		}
+	}
 }
