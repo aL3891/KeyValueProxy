@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 
@@ -15,9 +16,8 @@ namespace KeyValueProxy
         private static MethodInfo KVSetMethodAsync;
 
         private Dictionary<MethodInfo, ProxyNode> children = new Dictionary<MethodInfo, ProxyNode>();
-        private Dictionary<MethodInfo, (MethodInfo storeMethod, string key)> Meth = new Dictionary<MethodInfo, (MethodInfo storeMethod, string key)>();
+        private Dictionary<MethodInfo, (MethodInfo storeMethod, string key, string name, bool setter)> Meth = new Dictionary<MethodInfo, (MethodInfo storeMethod, string key, string name, bool setter)>();
         private RootProxyNode root;
-        private string path;
         List<PropertyChangedEventHandler> eventHandlers = null;
 
         static ProxyNode()
@@ -40,14 +40,15 @@ namespace KeyValueProxy
                 var a = new object[args.Length + 1];
                 Array.Copy(args, 0, a, 1, args.Length);
                 a[0] = m.key;
-                if (eventHandlers != null && (m.storeMethod == KVSetMethod || m.storeMethod == KVSetMethodAsync))
+                var res = m.storeMethod.Invoke(root.store, a);
+                if (eventHandlers != null && m.setter)
                 {
                     foreach (var handler in eventHandlers)
                     {
-                        handler(this, new PropertyChangedEventArgs(m.key));
+                        handler(this, new PropertyChangedEventArgs(m.name));
                     }
                 }
-                return m.storeMethod.Invoke(root.store, a);
+                return res;
             }
             else if (targetMethod.Name == "add_PropertyChanged")
             {
@@ -68,21 +69,20 @@ namespace KeyValueProxy
 
         internal void Initialize(Type type, string path, RootProxyNode root)
         {
-
             this.root = root;
-            this.path = path;
-
             foreach (var p in type.GetMethods())
             {
                 var propPath = (path != null ? path + "." : "") + p.Name.Substring(p.Name[3] == '_' ? 4 : 3);
                 var isAsync = p.ReturnType == typeof(Task) || p.ReturnType.IsGenericType && p.ReturnType.GetGenericTypeDefinition() == typeof(Task<>);
                 Type methodType = null;
                 MethodInfo storeMethod = null;
+                var setter = false;
 
                 if (p.Name.StartsWith("set", StringComparison.OrdinalIgnoreCase))
                 {
                     methodType = p.GetParameters()[0].ParameterType;
                     storeMethod = isAsync ? KVSetMethodAsync : KVSetMethod;
+                    setter = true;
                 }
                 else if (p.Name.StartsWith("get", StringComparison.OrdinalIgnoreCase))
                 {
@@ -109,7 +109,7 @@ namespace KeyValueProxy
                     continue;
                 }
 
-                Meth.Add(p, (storeMethod.MakeGenericMethod(methodType), propPath));
+                Meth.Add(p, (storeMethod.MakeGenericMethod(methodType), propPath, propPath.Split('.').Last(), setter));
             }
         }
     }
