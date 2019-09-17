@@ -19,15 +19,15 @@ namespace KeyValueProxyTests
 			var store = new DictionaryKVStore();
 			var target = KeyValueProxyFactory.Create<IPerson>(store);
 
-			//target.SetFirstName("test");
-			//target.GetFirstName().Should().Be("test");
-			//await target.SetLastName("test2");
-			//(await target.GetLastName()).Should().Be("test2");
-			//target.Age = 1;
-			//target.Age.Should().Be(1);
+            target.SetFirstName("test");
+            target.GetFirstName().Should().Be("test");
+            await target.SetLastName("test2");
+            (await target.GetLastName()).Should().Be("test2");
+            target.Age = 1;
+            target.Age.Should().Be(1);
 
-			//store.Store.Should().Contain("FirstName", "test");
-			//store.Store.Should().Contain("LastName", "test2");
+            store.Store.Should().Contain("FirstName", "test");
+            store.Store.Should().Contain("LastName", "test2");
 
             target.PropertyChanged += Target_PropertyChanged;
             target.Age = 1;
@@ -67,9 +67,16 @@ namespace KeyValueProxyTests
             var store = new DictionaryKVStore();
             var target = KeyValueProxyFactory.Create<IPerson>(store);
 
+            target.Address.State.PropertyChanged += State_PropertyChanged;
+
             target.Address.State.Code = "test";
             target.Address.State.Code.Should().Be("test");
             store.Store.Should().Contain("Address.State.Code", "test");
+        }
+
+        private void State_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            e.PropertyName.Should().Be("Code");
         }
     }
 }

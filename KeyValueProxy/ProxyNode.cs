@@ -16,9 +16,9 @@ namespace KeyValueProxy
         private static MethodInfo KVSetMethodAsync;
 
         private Dictionary<MethodInfo, ProxyNode> children = new Dictionary<MethodInfo, ProxyNode>();
-        private Dictionary<MethodInfo, (MethodInfo storeMethod, string key, string name, bool setter)> Meth = new Dictionary<MethodInfo, (MethodInfo storeMethod, string key, string name, bool setter)>();
+        private Dictionary<MethodInfo, (MethodInfo storeMethod, string key, string name, bool sendNpc)> Meth = new Dictionary<MethodInfo, (MethodInfo storeMethod, string key, string name, bool sendNpc)>();
         private RootProxyNode root;
-        List<PropertyChangedEventHandler> eventHandlers = null;
+        List<WeakReference<PropertyChangedEventHandler>> eventHandlers = null;
 
         static ProxyNode()
         {
@@ -41,26 +41,32 @@ namespace KeyValueProxy
                 Array.Copy(args, 0, a, 1, args.Length);
                 a[0] = m.key;
                 var res = m.storeMethod.Invoke(root.store, a);
-                if (eventHandlers != null && m.setter)
+                if (m.sendNpc && eventHandlers != null)
                 {
                     foreach (var handler in eventHandlers)
                     {
-                        handler(this, new PropertyChangedEventArgs(m.name));
+                        if (handler.TryGetTarget(out var r))
+                            r(this, new PropertyChangedEventArgs(m.name));
                     }
+                    eventHandlers.RemoveAll(w => !w.TryGetTarget(out var r));
                 }
                 return res;
             }
             else if (targetMethod.Name == "add_PropertyChanged")
             {
                 if (eventHandlers == null)
-                    eventHandlers = new List<PropertyChangedEventHandler>();
-                eventHandlers.Add((PropertyChangedEventHandler)args[0]);
+                    eventHandlers = new List<WeakReference<PropertyChangedEventHandler>>();
+
+                eventHandlers.Add(new WeakReference<PropertyChangedEventHandler>((PropertyChangedEventHandler)args[0]));
                 return null;
             }
             else if (targetMethod.Name == "remove_PropertyChanged")
             {
                 if (eventHandlers != null)
-                    eventHandlers.Remove((PropertyChangedEventHandler)args[0]);
+                {
+                    eventHandlers.RemoveAll(w => !w.TryGetTarget(out var r) || r == (PropertyChangedEventHandler)args[0]);
+                }
+
                 return null;
             }
 
@@ -70,19 +76,22 @@ namespace KeyValueProxy
         internal void Initialize(Type type, string path, RootProxyNode root)
         {
             this.root = root;
+            var isNPC = typeof(INotifyPropertyChanged).IsAssignableFrom(type);
             foreach (var p in type.GetMethods())
             {
-                var propPath = (path != null ? path + "." : "") + p.Name.Substring(p.Name[3] == '_' ? 4 : 3);
+                var name = p.Name.Substring(p.Name[3] == '_' ? 4 : 3);
+                var propPath = (path != null ? path + "." : "") + name;
                 var isAsync = p.ReturnType == typeof(Task) || p.ReturnType.IsGenericType && p.ReturnType.GetGenericTypeDefinition() == typeof(Task<>);
                 Type methodType = null;
                 MethodInfo storeMethod = null;
-                var setter = false;
+                var sendNpc = false;
 
                 if (p.Name.StartsWith("set", StringComparison.OrdinalIgnoreCase))
                 {
                     methodType = p.GetParameters()[0].ParameterType;
                     storeMethod = isAsync ? KVSetMethodAsync : KVSetMethod;
-                    setter = true;
+                    if (isNPC)
+                        sendNpc = true;
                 }
                 else if (p.Name.StartsWith("get", StringComparison.OrdinalIgnoreCase))
                 {
@@ -109,7 +118,7 @@ namespace KeyValueProxy
                     continue;
                 }
 
-                Meth.Add(p, (storeMethod.MakeGenericMethod(methodType), propPath, propPath.Split('.').Last(), setter));
+                Meth.Add(p, (storeMethod.MakeGenericMethod(methodType), propPath, sendNpc ? name : null, sendNpc));
             }
         }
     }
