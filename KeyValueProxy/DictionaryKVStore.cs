@@ -14,8 +14,8 @@ namespace KeyValueProxy
 
 		public T GetValue<T>(string property)
 		{
-			return (T)Store[property];
-		}
+            return Store.TryGetValue(property, out var res) ? (T)res : default(T);
+        }
 
 		public async Task SetValueAsync<T>(string property, T value)
 		{
@@ -24,7 +24,7 @@ namespace KeyValueProxy
 
 		public async Task<T> GetValueAsync<T>(string property)
 		{
-			return (T)Store[property];
-		}
+            return Store.TryGetValue(property, out var res) ? (T)res : default(T);
+        }
 	}
 }
